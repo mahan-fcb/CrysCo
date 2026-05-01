@@ -46,7 +46,8 @@ CrysCo/
 │   └── preprocessing/               # Data preprocessing
 │       ├── data_preparation.py      # CIF → .pt pipeline
 │       ├── graph_dihedral.py        # Graph construction with angles
-│       └── extracted_features.py    # Handcrafted feature extraction
+│       ├── extracted_features.py    # Human feature extraction (24-dim)
+│       └── get_MP.py                # Materials Project downloader
 ├── material/                        # Sample CIF files and CSV data
 ├── tests/                           # Test suite
 ├── docs/                            # Documentation
@@ -92,7 +93,7 @@ The preprocessing pipeline:
 2. Builds atomic graphs with distance-based edges
 3. Computes bond angles and dihedral angles (4-body interactions) via the `Graph` class
 4. Extracts per-atom features from `dictionary_default.json`
-5. Computes per-structure human features (density, symmetry, etc.) via matminer
+5. Computes handcrafted structural features (density, symmetry, lattice parameters, bond statistics) via `extracted_features.py`
 6. Saves as a PyTorch Geometric `InMemoryDataset`
 
 ### 2. Model Training
@@ -211,14 +212,15 @@ The dataset includes diverse inorganic crystal structures with corresponding cal
 - **SE(3) Layers**: Equivariant layers for 3D geometric information
 - **Residual Networks**: Skip connections for improved gradient flow
 
-### Input Features per Atom
-- **Atomic features** (114-dim): From `dictionary_default.json`
+### Input Features
+- **Atomic features** (114-dim): Per-atom properties from `dictionary_default.json`
 - **Angle features** (210-dim): 144 angle cosines + 66 dihedral angles from the `Graph` class
 - **Edge features** (50-dim): Gaussian-smeared bond distances
+- **Human features** (24-dim): Handcrafted structural descriptors (density, symmetry, lattice parameters, bond statistics) via matminer/pymatgen
 
 ### Data Flow
 ```
-CIF Files → Graph Construction → Angle/Dihedral Features → Model Training → Property Prediction
+CIF Files → Graph Construction → Angle/Dihedral Features → Human Feature Extraction → Model Training → Property Prediction
 ```
 
 ## Configuration
