@@ -18,10 +18,15 @@ import pandas as pd
 import os
 import csv
 import argparse
-from utils import EDM_CsvLoader, create_global_feat, threshold_sort, dense_to_sparse, add_self_loops, get_dictionary, GaussianSmearing, NormalizeEdge, OneHotDegree, Cleanup,dihedral_angles, bond_angles, process_data,create_global_feat,GetY
+import sys
+import os
+# Add root directory to path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+root_dir = os.path.join(current_dir, '../../')
+sys.path.insert(0, os.path.abspath(root_dir))
+from crysco.utils.utils import EDM_CsvLoader, create_global_feat, threshold_sort, dense_to_sparse, add_self_loops, get_dictionary, GaussianSmearing, NormalizeEdge, OneHotDegree, Cleanup, dihedral_angles, bond_angles, process_data, GetY
 import numpy as np
 import torch
-from graph_dihedral import atoms2pygdata, update_bonds_and_angles
 from ase.io import read
 from torch_geometric.data import Data
 from torch_geometric.data import InMemoryDataset
@@ -32,7 +37,8 @@ import numpy as np
 import os
 import csv
 import numpy as np
-from extracted_features import human_features
+from scripts.preprocessing.extracted_features import human_features
+from scripts.preprocessing.graph_dihedral import Graph
 
 def main(data_dir, csv_data, target_property_file,output):
 
@@ -87,6 +93,33 @@ def main(data_dir, csv_data, target_property_file,output):
         data.edge_weight = edge_weight
         data.edge_descriptor = {"distance": edge_weight, "mask": distance_matrix_mask}
 
+        # Add atomic positions
+        positions = torch.Tensor(ase_crystal.get_positions()).float()
+        data.pos = positions
+
+        # Use your existing Graph class to compute angle features
+        from pymatgen.core.structure import Structure
+
+        # Convert ASE to pymatgen structure
+        pymatgen_structure = Structure(
+            lattice=ase_crystal.get_cell(),
+            species=ase_crystal.get_chemical_symbols(),
+            coords=ase_crystal.get_positions(),
+            coords_are_cartesian=True
+        )
+
+        # Use your Graph class from graph_dihedral.py
+        graph = Graph(neighbors=12, rcut=8, delta=1)
+        graph.setGraphFea(pymatgen_structure)
+
+        # Your Graph class produces:
+        # - angle_cosines: [n_atoms, 12, 12] = 144 features per atom when flattened
+        # - dihedral_angles: [n_atoms, 12*11//2] = 66 features per atom
+        # Model expects 210 features per atom (144 + 66 = 210)
+        num_atoms = graph.angle_cosines.shape[0]
+        angle_flat = graph.angle_cosines.reshape(num_atoms, -1)
+        data.angle_fea = torch.cat([angle_flat, graph.dihedral_angles], dim=1).float()
+
         target = target_row[1:]
         y = torch.Tensor(np.array([target], dtype=np.float32))
         data.y = y
@@ -135,7 +168,8 @@ def main(data_dir, csv_data, target_property_file,output):
     crystal_length = len(ase_crystal)
     data.length = torch.LongTensor([crystal_length])
 
-    atom_dictionary = get_dictionary("dictionary_default.json")
+    dictionary_path = os.path.join(os.path.abspath(root_dir), "dictionary_default.json")
+    atom_dictionary = get_dictionary(dictionary_path)
     for data in data_list:
         atom_fea = np.vstack([atom_dictionary[str(atom.item())] for atom in data.z]).astype(float)
 

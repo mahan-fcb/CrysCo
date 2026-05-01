@@ -1,6 +1,7 @@
 import os
 import csv
 import numpy as np
+import torch
 from matminer.datasets import load_dataset
 from matminer.featurizers.structure import DensityFeatures, GlobalSymmetryFeatures
 from pymatgen.core import Structure

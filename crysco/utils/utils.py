@@ -7,7 +7,6 @@ from tqdm import tqdm
 from collections import OrderedDict
 import torch
 from torch_geometric.data import DataLoader, Dataset
-from composition import _element_composition
 import os
 import sys
 import time

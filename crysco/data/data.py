@@ -62,6 +62,7 @@ def setup_data_loaders(
         num_workers=num_workers,
         pin_memory=True,
         sampler=train_sampler,
+        drop_last=True,  # Drop incomplete batches to avoid BatchNorm errors with size-1 batches
     )
     # may scale down batch size if memory is an issue
     if device in (0, "cpu", "cuda"):

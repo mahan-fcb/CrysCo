@@ -1,67 +1,47 @@
-"""
-Test script to verify all imports and basic functionality work correctly.
-"""
+"""Smoke tests verifying the package imports correctly after reorganization."""
+import os
+import sys
 
-def test_basic_imports():
-    """Test basic Python imports."""
-    print("Testing basic imports...")
-    import numpy as np
-    import pandas as pd
-    print("✅ NumPy and Pandas imported successfully")
+# Add repo root to path so tests can run standalone
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-    try:
-        import torch
-        print(f"✅ PyTorch {torch.__version__} imported successfully")
-    except ImportError as e:
-        print(f"❌ PyTorch import failed: {e}")
-        return False
-
-    return True
 
 def test_model_imports():
-    """Test model component imports."""
-    print("\nTesting model component imports...")
-    try:
-        from MLP import MLP
-        print("✅ MLP imported successfully")
+    from crysco.models.CrysCo import CrysCo
+    from crysco.models.EGAT import EGAT_att
+    from crysco.models.transformer import Transformer
+    from crysco.models.MLP import MLP
+    assert CrysCo is not None
+    assert MLP is not None
 
-        # Test MLP functionality
-        mlp = MLP([10, 20, 1])
-        print(f"✅ MLP created: {mlp}")
-
-    except Exception as e:
-        print(f"❌ MLP test failed: {e}")
-        return False
-
-    return True
 
 def test_data_imports():
-    """Test data handling imports."""
-    print("\nTesting data handling imports...")
-    try:
-        from data import setup_data_loaders
-        print("✅ Data loader setup imported successfully")
+    from crysco.data.data import setup_data_loaders, get_dataset, StructureDataset, GetY
+    assert setup_data_loaders is not None
+    assert get_dataset is not None
 
-        from utils_train import train_model
-        print("✅ Training utilities imported successfully")
 
-    except Exception as e:
-        print(f"❌ Data/training import failed: {e}")
-        return False
+def test_training_imports():
+    from crysco.utils.utils_train import (
+        train_model,
+        train_one_epoch,
+        model_setup,
+        evaluate,
+        write_results,
+    )
+    assert train_model is not None
+    assert model_setup is not None
 
-    return True
+
+def test_preprocessing_imports():
+    from scripts.preprocessing.graph_dihedral import Graph
+    g = Graph(neighbors=12, rcut=8, delta=1)
+    assert g.neighbors == 12
+
 
 if __name__ == "__main__":
-    print("🧪 TESTING CLEANED CRYSCO CODE")
-    print("=" * 50)
-
-    success = True
-    success &= test_basic_imports()
-    success &= test_model_imports()
-    success &= test_data_imports()
-
-    print("\n" + "=" * 50)
-    if success:
-        print("🎉 ALL TESTS PASSED! Code cleanup successful.")
-    else:
-        print("❌ Some tests failed. Check the error messages above.")
+    test_model_imports()
+    test_data_imports()
+    test_training_imports()
+    test_preprocessing_imports()
+    print("All import tests passed.")

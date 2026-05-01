@@ -60,7 +60,7 @@ model_parameters = {
         ,"act": "silu"
         ,"model": "CrysCo"
         ,"dropout_rate": 0.0
-        ,"epochs": 3
+        ,"epochs": 100
         ,"lr": 0.006
         ,"batch_size": 80
         ,"optimizer": "AdamW"
@@ -83,14 +83,35 @@ job_parameters= {
 }
 def main():
     # Parse command line arguments
-    parser = argparse.ArgumentParser(description="Train the model")
+    parser = argparse.ArgumentParser(description="Train the CrysCo model")
     parser.add_argument("--data_dir", type=str, required=True, help="Directory containing the dataset")
-    parser.add_argument("--data", type=str, required=True, help=" dataset")
+    parser.add_argument("--data", type=str, required=True, help="Dataset file name (.pt)")
+    parser.add_argument("--device", type=str, default="cuda", choices=["cuda", "cpu"], help="Device to use: cuda or cpu")
+    parser.add_argument("--epochs", type=int, default=model_parameters["epochs"], help="Number of training epochs")
+    parser.add_argument("--batch_size", type=int, default=model_parameters["batch_size"], help="Batch size")
+    parser.add_argument("--lr", type=float, default=model_parameters["lr"], help="Learning rate")
+    parser.add_argument("--train_ratio", type=float, default=0.85, help="Training data ratio")
+    parser.add_argument("--val_ratio", type=float, default=0.05, help="Validation data ratio")
+    parser.add_argument("--test_ratio", type=float, default=0.10, help="Test data ratio")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    parser.add_argument("--model_path", type=str, default=job_parameters["model_path"], help="Path to save model")
+    parser.add_argument("--job_name", type=str, default=job_parameters["job_name"], help="Job name for output files")
     args = parser.parse_args()
 
-    # Assuming 'data_elasticity.pt' is in the specified data directory
-    database_path = os.path.join(args.data_dir, args.data)
-    
+    # Override model_parameters with CLI args
+    model_parameters["epochs"] = args.epochs
+    model_parameters["batch_size"] = args.batch_size
+    model_parameters["lr"] = args.lr
+
+    # Check CUDA availability and fall back to CPU if needed
+    device = args.device
+    if device == "cuda" and not torch.cuda.is_available():
+        print("CUDA requested but not available. Falling back to CPU.")
+        device = "cpu"
+    print(f"Using device: {device}")
+    print(f"Training config: epochs={args.epochs}, batch_size={args.batch_size}, lr={args.lr}")
+    print(f"Data split: train={args.train_ratio}, val={args.val_ratio}, test={args.test_ratio}")
+
     # Setup the dataset
     database = get_dataset(args.data_dir, args.data, 0)
 
@@ -104,19 +125,19 @@ def main():
         _,
         _,
     ) = setup_data_loaders(
-        0.85,
-        0.05,
-        0.10,
-        90,
+        args.train_ratio,
+        args.val_ratio,
+        args.test_ratio,
+        args.batch_size,
         database,
-        'cuda',
-        42,
+        device,
+        args.seed,
         0,
     )
 
     # Setup the model
     model = model_setup(
-        'cuda',
+        device,
         'CrysCo',
         model_parameters,
         database,
@@ -132,7 +153,7 @@ def main():
     )
 
     train_model(
-            'cuda',
+            device,
             0,
             model,
             optimizer,
@@ -144,7 +165,7 @@ def main():
             model_parameters["epochs"],
             training_parameters["verbosity"],
             "my_model_temp.pth")
-    
+
 
     train_error = val_error = test_error = float("NaN")
 
@@ -160,21 +181,21 @@ def main():
 
     ##Get train error in eval mode
     train_error, train_out = evaluate(
-        train_loader, model, training_parameters["loss"], 'cuda', out=True
+        train_loader, model, training_parameters["loss"], device, out=True
     )
     print("Train Error: {:.5f}".format(train_error))
 
     ##Get val error
     if val_loader != None:
         val_error, val_out = evaluate(
-            val_loader, model, training_parameters["loss"], 'cuda', out=True
+            val_loader, model, training_parameters["loss"], device, out=True
         )
         print("Val Error: {:.5f}".format(val_error))
 
     ##Get test error
     if test_loader != None:
         test_error, test_out = evaluate(
-            test_loader, model, training_parameters["loss"], 'cuda', out=True
+            test_loader, model, training_parameters["loss"], device, out=True
         )
         print("Test Error: {:.5f}".format(test_error))
 
@@ -186,22 +207,22 @@ def main():
             "scheduler_state_dict": scheduler.state_dict(),
             "full_model": model,
         },
-        job_parameters["model_path"],
+        args.model_path,
     )
 
     ##Write outputs
     if job_parameters["write_output"] == "True":
 
         write_results(
-            train_out, str(job_parameters["job_name"]) + "_train_outputs.csv"
+            train_out, str(args.job_name) + "_train_outputs.csv"
         )
         if val_loader != None:
             write_results(
-                val_out, str(job_parameters["job_name"]) + "_val_outputs.csv"
+                val_out, str(args.job_name) + "_val_outputs.csv"
             )
         if test_loader != None:
             write_results(
-                test_out, str(job_parameters["job_name"]) + "_test_outputs.csv"
+                test_out, str(args.job_name) + "_test_outputs.csv"
             )
 
 
