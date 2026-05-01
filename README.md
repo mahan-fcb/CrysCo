@@ -1,61 +1,157 @@
-# This repository includes CrysCo model to predict inorganic material properties via a hybrid graph-transformer based model.
+# CrysCo: Hybrid Graph-Transformer for Materials Property Prediction
 
-"Accelerating materials property prediction via a hybrid Transformer Graph framework that leverages four body interactions"
+A PyTorch implementation of a hybrid graph-transformer neural network that combines Edge Graph Attention Networks (EGAT) and Transformer architectures for predicting inorganic material properties.
 
-# Dataset
+**Paper**: "Accelerating materials property prediction via a hybrid Transformer Graph framework that leverages four body interactions"
 
-We trained our model mainly on MP21 datasets for 8 properties.
+## Features
 
-# Data preprocessing
+- **Hybrid Architecture**: Combines EGAT, Transformer, and SE(3)-equivariant layers
+- **4-body Interactions**: Incorporates dihedral angles for enhanced geometric understanding  
+- **Materials Project Integration**: Trained on MP21 datasets for 8 material properties
+- **Scalable Training**: Supports single-GPU and distributed training
 
-"First, download CIF files from the Material Project database using pymatgen as outlined in the data_extraction.ipynb notebook. Ensure to save all CIF files and generate two CSV files containing pretty formulas and calculated properties.
+## Installation
 
-Please note that in cases where multiple materials have the same pretty formula but different structures, we append a unique identifier number to the end of each pretty formula in one of the CSV files. This differentiation allows for proper identification of materials with similar formulas but distinct structures."
+### Prerequisites
+- Python 3.8+
+- PyTorch 1.12+
+- CUDA (recommended for GPU acceleration)
 
-# Graph generation and feature extraction:
+### Install from source
+```bash
+git clone https://github.com/user/CrysCo.git
+cd CrysCo
+pip install -r requirements.txt
+pip install -e .
+```
 
-"Before training the model, you must run data_generation.py with the following command:
+## Quick Start
 
-python data_preparation.py --path_to_cif_structure <path_to_cif_structure> --first_csv_file <first_CSV_file> --second_csv_file <second_CSV_file> --output <output_directory>
+### 1. Data Preparation
+Download CIF files from Materials Project and prepare the dataset:
 
+```bash
+python data_preparation.py \
+    --path_to_cif_structure path/to/cif/files \
+    --first_csv_file formulas.csv \
+    --second_csv_file formulas_with_ids.csv \
+    --output processed/
+```
 
-Please note that the first_CSV_file should contain regular pretty formula data, while the second_CSV_file should include pretty formula with an identifier."
+**Note**: The first CSV should contain regular pretty formulas, while the second should include formulas with unique identifiers for materials with similar compositions but different structures.
 
-This revision provides a clear instruction for running the data_generation.py script, specifying the required arguments and clarifying the purpose of each CSV file.
+### 2. Model Training
+```bash
+python main.py --data_dir . --data processed/dataset.pt
+```
 
-# Models:
-"To train the CrysCo model, you will need to use the model_training.py script. First, ensure that CrysCo.py includes the desired model architecture. Then, execute the following command in your terminal:
+### 3. Prediction
+Use the `prediction.ipynb` notebook for inference with trained models.
 
-python main.py --data_dir "current path" --data "generated data obtained from running the data_preparation.py"
+## Dataset
 
-Remember, you can easily modify all parameters and models by editing parameter.py. Additionally, ensure that all generated data is saved in the processed directory."
+We primarily use the **Materials Project MP21** dataset covering 8 properties:
+- Formation energy
+- Band gap
+- Bulk modulus
+- Shear modulus
+- And 4 additional properties
 
-This revised version clarifies the steps required to train the model, specifies the commands to execute, and emphasizes the importance of saving generated data in the correct directory.
-# Example: 
-"To perform data generation and model training using the directory "C:/Users/mom19004/Downloads/sams/", you would need to follow these steps:"
+The dataset includes diverse inorganic crystal structures with corresponding calculated properties.
 
-1- python C:/Users/mom19004/Downloads/sams/data_preparation.py "C:/Users/mom19004/Downloads/sams/temp_folder/material_cif" "ehs.csv" "eh.csv" "C:/Users/mom19004/Downloads/sams/processed/"M.pt"
+## Model Architecture
 
+### Core Components
+- **EGAT Layers**: Edge Graph Attention Networks for processing atomic graphs
+- **Transformer**: Standard transformer with positional encoding
+- **SE(3) Layers**: Equivariant layers for 3D geometric information
+- **Residual Networks**: Skip connections for improved gradient flow
 
-2-python C:/Users/mom19004/Downloads/sams/main.py --data_dir "C:/Users/mom19004/Downloads/sams/" --data "M.pt"
+### Data Flow
+```
+CIF Files → Graph Construction → Feature Extraction → Model Training → Property Prediction
+```
 
-# Prediction
+## Configuration
 
-for prediction, you can use prediction.ipynb file. you need to run this notebook in the difrectory that you saved your pretrained model.
+Key parameters in `main.py`:
 
-# References 
+```python
+model_parameters = {
+    "out_dims": 64,
+    "d_model": 128,
+    "N": 3,              # Transformer layers
+    "heads": 4,          # Attention heads
+    "numb_EGAT": 5,      # Number of EGAT layers
+    "epochs": 800,
+    "lr": 0.006,
+    "batch_size": 80
+}
+```
 
-If you use this repository, in addition to our manuscript, please cite the following papers:
+## Examples
 
-1- Omee, Sadman Sadeed, et al. "Scalable deeper graph neural networks for high-performance materials property prediction." Patterns 3.5 (2022).
+Training with custom data:
+```bash
+# Example with absolute paths
+python data_preparation.py \
+    "/path/to/materials/cif_files" \
+    "properties.csv" \
+    "properties_with_ids.csv" \
+    "/path/to/output/dataset.pt"
 
+python main.py --data_dir "/path/to/project" --data "dataset.pt"
+```
 
-2- Wang, Anthony Yu-Tung, et al. "Compositionally restricted attention-based network for materials property predictions." Npj Computational Materials 7.1 (2021): 77.
+## Project Structure
 
-If you have any question, please send me an email:
-mohammad73madani73@gmail.com
+```
+CrysCo/
+├── crysco/                    # Main Python package
+│   ├── models/               # Neural network models
+│   │   ├── CrysCo.py        # Main hybrid model
+│   │   ├── EGAT.py          # Edge Graph Attention Networks
+│   │   ├── transformer.py   # Transformer components
+│   │   ├── SE.py            # SE(3)-equivariant layers
+│   │   └── MLP.py           # Multi-layer perceptrons
+│   ├── data/                # Data loading utilities
+│   │   └── data.py          # Dataset classes and loaders  
+│   └── utils/               # Training utilities
+│       └── utils_train.py   # Training loops and model setup
+├── scripts/                  # Standalone scripts
+│   └── preprocessing/       # Data preprocessing scripts
+│       ├── data_preparation.py
+│       ├── graph_dihedral.py
+│       └── extracted_features.py
+├── tests/                   # Test suite
+├── docs/                   # Documentation
+├── main.py                 # Main training script
+├── material/              # Sample data
+├── processed/            # Generated datasets
+└── prediction.ipynb     # Inference notebook
+```
 
+## Contributing
 
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
 
+## Citation
 
+If you use this code, please cite our manuscript and the following papers:
 
+1. Omee, Sadman Sadeed, et al. "Scalable deeper graph neural networks for high-performance materials property prediction." *Patterns* 3.5 (2022).
+
+2. Wang, Anthony Yu-Tung, et al. "Compositionally restricted attention-based network for materials property predictions." *npj Computational Materials* 7.1 (2021): 77.
+
+## Contact
+
+For questions or issues, please contact: mohammad73madani73@gmail.com
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

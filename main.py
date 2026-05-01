@@ -1,51 +1,49 @@
 
+"""
+CrysCo Training Script
+
+This script handles the training of the CrysCo hybrid graph-transformer model
+for materials property prediction. It includes model configuration, training
+parameters, and the main training loop with distributed training support.
+
+Usage:
+    python main.py --data_dir <project_directory> --data <dataset_file>
+"""
+
+import argparse
 import csv
-import os
-import time
-from datetime import datetime
-import shutil
-import copy
-import numpy as np
-from functools import partial
-import platform
 import os
 import sys
 import time
-import csv
 import json
 import warnings
+import shutil
+import copy
+import glob
+from datetime import datetime
+from functools import partial
+import platform
+
 import numpy as np
 import ase
-import glob
 from ase import io
 from scipy.stats import rankdata
 from scipy import interpolate
-from torch_geometric.data import DataLoader, Dataset
-##torch imports
+
 import torch
 import torch.nn.functional as F
+import torch.distributed as dist
+import torch.multiprocessing as mp
 from torch_geometric.data import DataLoader, Dataset, Data, InMemoryDataset
 from torch_geometric.utils import dense_to_sparse, degree, add_self_loops
-import torch_geometric.transforms as T
-from torch_geometric.utils import degree
-import process
-##Torch imports
-import torch.nn.functional as F
-import torch
-from torch_geometric.data import DataLoader, Dataset
 from torch_geometric.nn import DataParallel
 import torch_geometric.transforms as T
 from torch.utils.data.distributed import DistributedSampler
 from torch.nn.parallel import DistributedDataParallel
-import torch.distributed as dist
-import torch.multiprocessing as mp
-import process
-#from dataload import loader_setup, get_dataset
-from CrysCo import CrysCo
-import argparse  # Add this line to import argparse
 
-from utils_train import trainer, train,model_setup,model_summary,evaluate,write_results
-from data import loader_setup,get_dataset,StructureDataset,GetY
+from crysco.models.CrysCo import CrysCo
+from crysco.utils.utils_train import train_model, train_one_epoch, model_setup, model_summary, evaluate, write_results
+from crysco.data.data import setup_data_loaders, get_dataset, StructureDataset, GetY
 
 model_parameters = {  
        "out_dims":64,
@@ -62,7 +60,7 @@ model_parameters = {
         ,"act": "silu"
         ,"model": "CrysCo"
         ,"dropout_rate": 0.0
-        ,"epochs": 800
+        ,"epochs": 3
         ,"lr": 0.006
         ,"batch_size": 80
         ,"optimizer": "AdamW"
@@ -105,7 +103,7 @@ def main():
         train_dataset,
         _,
         _,
-    ) = loader_setup(
+    ) = setup_data_loaders(
         0.85,
         0.05,
         0.10,
@@ -133,7 +131,7 @@ def main():
         optimizer, **model_parameters["scheduler_args"]
     )
 
-    trainer(
+    train_model(
             'cuda',
             0,
             model,
@@ -145,7 +143,7 @@ def main():
             train_sampler,
             model_parameters["epochs"],
             training_parameters["verbosity"],
-            "my_model_temp.pth",)
+            "my_model_temp.pth")
     
 
     train_error = val_error = test_error = float("NaN")
@@ -162,21 +160,21 @@ def main():
 
     ##Get train error in eval mode
     train_error, train_out = evaluate(
-        train_loader, model, training_parameters["loss"], rank, out=True
+        train_loader, model, training_parameters["loss"], 'cuda', out=True
     )
     print("Train Error: {:.5f}".format(train_error))
 
     ##Get val error
     if val_loader != None:
         val_error, val_out = evaluate(
-            val_loader, model, training_parameters["loss"], rank, out=True
+            val_loader, model, training_parameters["loss"], 'cuda', out=True
         )
         print("Val Error: {:.5f}".format(val_error))
 
     ##Get test error
     if test_loader != None:
         test_error, test_out = evaluate(
-            test_loader, model, training_parameters["loss"], rank, out=True
+            test_loader, model, training_parameters["loss"], 'cuda', out=True
         )
         print("Test Error: {:.5f}".format(test_error))
 
